@@ -1,0 +1,6 @@
+endee
+groq
+sentence-transformers
+streamlit
+pypdf
+python-dotenv

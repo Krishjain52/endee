@@ -1,139 +1,211 @@
-<p align="center">
-  <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-      <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo-light.svg">
-      <img height="100" alt="Endee" src="docs/assets/logo-dark.svg">
-  </picture>
-</p>
+# 🔬 ResearchMind — Agentic Research Intelligence System
 
-<p align="center">
-    <b>High-performance open-source vector database for AI search, RAG, semantic search, and hybrid retrieval.</b>
-</p>
+> An AI agent that reads scientific papers, reasons across them, and synthesizes structured research briefs — powered by **Endee Vector Database** and **Groq (Llama 3.3 70B)**.
 
-<p align="center">
-    <a href="./docs/getting-started.md"><img src="https://img.shields.io/badge/Quick_Start-Local_Setup-success?style=flat-square" alt="Quick Start"></a>
-    <a href="https://docs.endee.io/quick-start"><img src="https://img.shields.io/badge/Docs-Quick_Start-success?style=flat-square" alt="Docs"></a>
-    <a href="https://github.com/endee-io/endee/blob/master/LICENSE"><img src="https://img.shields.io/github/license/endee-io/endee?style=flat-square" alt="License"></a>
-    <a href="https://discord.gg/5HFGqDZQE3"><img src="https://img.shields.io/badge/Discord-Join_Chat-5865F2?logo=discord&style=flat-square" alt="Discord"></a>
-    <a href="https://endee.io/"><img src="https://img.shields.io/badge/Website-Endee-111111?style=flat-square" alt="Website"></a>
-    <!-- <a href="https://endee.io/benchmarks"><img src="https://img.shields.io/badge/Benchmarks-Coming_Soon-1F8B4C?style=flat-square" alt="Benchmarks"></a> -->
-    <!-- <a href="https://endee.io/cloud"><img src="https://img.shields.io/badge/Cloud-Coming_Soon-2496ED?style=flat-square" alt="Cloud"></a> -->
-</p>
+![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square)
+![Endee](https://img.shields.io/badge/Vector%20DB-Endee-7c6af5?style=flat-square)
+![Groq](https://img.shields.io/badge/LLM-Groq%20%7C%20Llama%203.3-orange?style=flat-square)
+![Streamlit](https://img.shields.io/badge/UI-Streamlit-red?style=flat-square)
 
-<p align="center">
-<strong><a href="./docs/getting-started.md">Quick Start</a> • <a href="#why-endee">Why Endee</a> • <a href="#use-cases">Use Cases</a> • <a href="#features">Features</a> • <a href="#api-and-clients">API and Clients</a> • <a href="#docs-and-links">Docs</a> • <a href="#community-and-contact">Contact</a></strong>
-</p>
+---
 
-# Endee: Open-Source Vector Database for AI Search
+## 📌 Problem Statement
 
-**Endee** is a high-performance open-source vector database built for AI search and retrieval workloads. It is designed for teams building **RAG pipelines**, **semantic search**, **hybrid search**, recommendation systems, and filtered vector retrieval APIs that need production-oriented performance and control.
+Researchers and engineers often need to synthesize information across **many papers** to answer a single research question. Traditional keyword search fails here — it can't understand semantic meaning or reason about relationships between ideas.
 
-Endee combines vector search with filtering, sparse retrieval support, backup workflows, and deployment flexibility across local builds and Docker-based environments. The project is implemented in C++ and optimized for modern CPU targets, including AVX2, AVX512, NEON, and SVE2.
+ResearchMind solves this by combining:
+- **Semantic vector search** (Endee) for meaning-aware retrieval
+- **Agentic reasoning** (Groq LLM) that plans, reflects, and iterates — not just "ask once, answer once"
 
-If you want the fastest path to evaluate Endee locally, start with the [Getting Started guide](./docs/getting-started.md) or the hosted docs at [docs.endee.io](https://docs.endee.io/quick-start).
+---
 
-## Why Endee
+## 🧠 System Design
 
-- Built as a dedicated vector database for AI applications, search systems, and retrieval-heavy workloads.
-- Supports dense vector retrieval plus sparse search capabilities for hybrid search use cases.
-- Includes payload filtering for metadata-aware retrieval and application-specific query logic.
-- Ships with operational features already documented in this repo, including backup flows and runtime observability.
-- Offers flexible deployment paths: local scripts, manual builds, Docker images, and prebuilt registry images.
-
-## Getting Started
-
-The full installation, build, Docker, runtime, and authentication instructions are in [docs/getting-started.md](./docs/getting-started.md).
-
-Fastest local path:
-
-```bash
-chmod +x ./install.sh ./run.sh
-./install.sh --release --avx2
-./run.sh
+```
+User Question
+      │
+      ▼
+┌─────────────────────┐
+│   DECOMPOSE (LLM)   │  Break into 2-4 focused sub-questions
+└──────────┬──────────┘
+           │
+     ┌─────▼──────────────────────────────┐
+     │         AGENT LOOP (per sub-q)      │
+     │                                     │
+     │  ┌──────────────────────────────┐   │
+     │  │  SEARCH → Endee Vector DB    │   │
+     │  │  (cosine similarity, INT8)   │   │
+     │  └──────────────┬───────────────┘   │
+     │                 │                   │
+     │  ┌──────────────▼───────────────┐   │
+     │  │  REFLECT (LLM)               │   │
+     │  │  Sufficient? → Done          │   │
+     │  │  Not sufficient? → Refine    │◄──┤
+     │  │  query and search again      │   │
+     │  └──────────────────────────────┘   │
+     └─────────────────────────────────────┘
+           │
+      ▼ (all retrieved chunks)
+┌─────────────────────┐
+│   SYNTHESIZE (LLM)  │  Generate structured research brief
+└──────────┬──────────┘
+           │
+      ▼
+  📋 Research Brief (Markdown)
+  📎 Source Evidence with scores
+  ⬇️  Downloadable report
 ```
 
-The server listens on port `8080`. For detailed setup paths, supported operating systems, CPU optimization flags, Docker usage, and authentication examples, use:
+### Why this is agentic (not just RAG):
+| Feature | Standard RAG | ResearchMind |
+|---|---|---|
+| Query strategy | Single fixed query | Decomposes into sub-questions |
+| Search iterations | 1 | Up to N (configurable) |
+| Self-evaluation | ❌ | ✅ Reflects on result quality |
+| Query refinement | ❌ | ✅ Generates improved queries |
+| Output | Raw answer | Structured research brief |
 
-- [Getting Started](./docs/getting-started.md)
-- [Hosted Quick Start Docs](https://docs.endee.io/quick-start)
+---
 
-## Use Cases
+## 🏗️ How Endee Is Used
 
-### RAG and AI Retrieval
+Endee serves as the **core knowledge store** for the entire pipeline.
 
-Use Endee as the retrieval layer for question answering, chat assistants, copilots, and other RAG applications that need fast vector search with metadata-aware filtering.
+### Index Creation
+```python
+client.create_index(
+    name="research_papers",
+    dimension=384,          # all-MiniLM-L6-v2 output size
+    space_type="cosine",    # cosine similarity for semantic search
+    precision=Precision.INT8  # 4x memory savings vs float32
+)
+```
 
-### Agentic AI and AI Agent Memory
+### Ingestion (PDF → Chunks → Vectors → Endee)
+```python
+# Each paper is chunked into 250-word overlapping segments
+# Each chunk is embedded with sentence-transformers and stored:
+index.upsert([{
+    "id": "arxiv_2310.06825.pdf__chunk__42",
+    "vector": embedding,   # 384-dim float list
+    "meta": {
+        "text":  chunk_text,    # stored for retrieval
+        "paper": "arxiv_2310.06825.pdf",
+        "chunk": 42
+    }
+}])
+```
 
-Use Endee as the long-term memory and context retrieval layer for AI agents built with frameworks like LangChain, CrewAI, AutoGen, and LlamaIndex. Store and retrieve past observations, tool outputs, conversation history, and domain knowledge mid-execution with low-latency filtered vector search, so your autonomous agents get the right context without stalling their reasoning loop.
+### Semantic Search (inside the agent loop)
+```python
+query_vector = model.encode(sub_question).tolist()
+results = index.query(vector=query_vector, top_k=8)
 
-### Semantic Search
+# Each result has:
+# result.similarity   → cosine score (higher = more relevant)
+# result.meta["text"] → the actual text chunk
+# result.meta["paper"] → source paper name
+```
 
-Build semantic search experiences for documents, products, support content, and knowledge bases using vector similarity search instead of exact keyword-only matching.
+### Why Endee over alternatives?
+- **Single-node scalability**: Can handle up to 1B vectors — future-proof as the paper corpus grows
+- **INT8 precision**: Reduces memory footprint by ~4x with minimal accuracy loss, critical for large corpora
+- **Low latency**: Sub-millisecond query times even at scale — the agent loop makes multiple sequential searches, so latency matters
 
-### Hybrid Search
+---
 
-Combine dense retrieval, sparse vectors, and filtering to improve relevance for search workflows where both semantic understanding and term-level precision matter.
+## 🚀 Setup & Running
 
-### Recommendations and Matching
+### Prerequisites
+- Docker (for Endee)
+- Python 3.10+
+- [Groq API Key](https://console.groq.com) (free tier available)
 
-Support recommendation, similarity matching, and nearest-neighbor retrieval workflows across text, embeddings, and other high-dimensional representations.
+### 1. Start Endee
+```bash
+docker compose up -d
+# Endee dashboard: http://localhost:8080
+```
 
-## Features
+### 2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
 
-- **Vector search** for AI retrieval and semantic similarity workloads.
-- **Hybrid retrieval support** with sparse vector capabilities documented in [docs/sparse.md](./docs/sparse.md).
-- **Payload filtering** for structured retrieval logic documented in [docs/filter.md](./docs/filter.md).
-- **Backup APIs and flows** documented in [docs/backup-system.md](./docs/backup-system.md).
-- **Operational logging and instrumentation** documented in [docs/logs.md](./docs/logs.md) and [docs/mdbx-instrumentation.md](./docs/mdbx-instrumentation.md).
-- **CPU-targeted builds** for AVX2, AVX512, NEON, and SVE2 deployments.
-- **Docker deployment options** for local and server environments.
+### 3. Set your Groq API key
+```bash
+cp .env.example .env
+# Edit .env and add your GROQ_API_KEY
+export GROQ_API_KEY=your_key_here
+```
 
-## API and Clients
+### 4. Run the app
+```bash
+streamlit run app.py
+```
 
-Endee exposes an HTTP API for managing indexes and serving retrieval workloads. The current repo documentation and examples focus on running the server directly and calling its API endpoints.
+### 5. Ingest papers & ask questions
+1. Upload PDFs via the sidebar **or** paste an ArXiv URL (e.g. `https://arxiv.org/abs/1706.03762`)
+2. Type a research question in the main panel
+3. Watch the agent decompose, search, reflect, and synthesize in real-time
 
-Current developer entry points:
+---
 
-- [Getting Started](./docs/getting-started.md) for local build and run flows
-- [Hosted Docs](https://docs.endee.io/quick-start) for product documentation
-- [Release Notes 1.0.0](https://github.com/endee-io/endee/releases/tag/1.0.0) for recent platform changes
+## 💡 Example Usage
 
-## Docs and Links
+**Question:** *"What techniques are used to reduce hallucinations in large language models?"*
 
-- [Getting Started](./docs/getting-started.md)
-- [Hosted Documentation](https://docs.endee.io/quick-start)
-- [Release Notes](https://github.com/endee-io/endee/releases/tag/1.0.0)
-- [Sparse Search](./docs/sparse.md)
-- [Filtering](./docs/filter.md)
-- [Backups](./docs/backup-system.md)
+**Agent trace:**
+```
+🧩 DECOMPOSE → 3 sub-questions:
+   "What causes hallucinations in LLMs?"
+   "What training methods reduce hallucination?"
+   "What inference-time techniques improve factuality?"
 
-## Community and Contact
+🔍 ENDEE SEARCH [1/3] → "What causes hallucinations in LLMs?"
+✅ RETRIEVED → 8 chunks from 3 papers — top score: 0.847
 
-- Join the community on [Discord](https://discord.gg/5HFGqDZQE3)
-- Visit the website at [endee.io](https://endee.io/)
-- For trademark or branding permissions, contact [enterprise@endee.io](mailto:enterprise@endee.io)
+💭 REFLECT → Results cover causes well. Moving to training methods.
 
-## Contributing
+🔍 ENDEE SEARCH [2/3] → "What training methods reduce hallucination?"
+✅ RETRIEVED → 8 chunks from 4 papers — top score: 0.831
 
-We welcome contributions from the community to help make vector search faster and more accessible for everyone.
+💭 REFLECT → Limited detail on RLHF. Refining query.
 
-- Submit pull requests for fixes, features, and improvements
-- Report bugs or performance issues through GitHub issues
-- Propose enhancements for search quality, performance, and deployment workflows
+🔍 ENDEE SEARCH [3/3] → "RLHF reinforcement learning human feedback factuality"
+✅ RETRIEVED → 8 chunks from 2 papers — top score: 0.792
 
-## License
+⚡ SYNTHESIZE → Generating research brief...
+```
 
-Endee is open source software licensed under the **Apache License 2.0**. See the [LICENSE](./LICENSE) file for full terms.
+---
 
-## Trademark and Branding
+## 📁 Project Structure
 
-“Endee” and the Endee logo are trademarks of Endee Labs.
+```
+researchmind/
+├── app.py              # Streamlit UI — renders agent trace + results
+├── agent.py            # Agentic loop: decompose → search → reflect → synthesize
+├── ingest.py           # PDF/ArXiv ingestion pipeline into Endee
+├── requirements.txt
+├── docker-compose.yml  # Endee server
+├── .env.example
+└── README.md
+```
 
-The Apache License 2.0 does not grant permission to use the Endee name, logos, or branding in a way that suggests endorsement or affiliation.
+---
 
-If you offer a hosted or managed service based on this software, you must use your own branding and avoid implying it is an official Endee service.
+## 🔧 Configuration
 
-## Third-Party Software
+| Parameter | Default | Description |
+|---|---|---|
+| `CHUNK_SIZE` | 250 words | Chunk size for document splitting |
+| `OVERLAP` | 40 words | Overlap between chunks |
+| `TOP_K` | 8 | Chunks retrieved per search |
+| `GROQ_MODEL` | llama-3.3-70b-versatile | LLM for decompose/reflect/synthesize |
+| `max_iterations` | 3 | Max search-reflect iterations per sub-question |
 
-This project includes or depends on third-party software components licensed under their respective open-source licenses. Use of those components is governed by their own license terms.
+---
+
+## 📜 License
+MIT
